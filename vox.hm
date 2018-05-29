@@ -1,0 +1,141 @@
+addMagicNumber 56 4f 58 20
+
+addExtension vox
+
+import lestd
+
+class VoxFile as File
+{
+	String(4) signature;
+	int(32) version;
+	String(4) main;
+	int(32) mainContentSize;
+	int(32) mainChildsSize;
+	
+	while(1) Chunk *;
+	
+}
+
+class Chunk(code)
+{
+	String(4) code;
+	int(32) contentSize;
+	int(32) childSize;
+	@args.code = code;
+	@args.size = (contentSize + childSize) * 8;
+}
+
+class SIZE as Chunk("SIZE")
+{
+	int(32) SIZE_X;
+	int(32) SIZE_Y;
+	int(32) SIZE_Z;	
+	@value = %str(SIZE_X)+" "+%str(SIZE_Y)+" "+%str(SIZE_Z);
+}
+
+class XYZI as Chunk("XYZI")
+{
+	int(32) numVoxels;
+	VOXEL voxels[numVoxels];
+}
+
+class LAYER(id) as Chunk("LAYR")
+{
+	int(32) nodeId;
+	@args.id = nodeId;
+	DICT nodeAttribs;
+	int(32) unknow;
+}
+
+class RGBA as Chunk("RGBA")
+{
+	COLOR colors[256];
+}
+
+class COLOR
+{
+	byte red;
+	byte green;
+	byte blue;
+	byte alpha;
+}
+
+class VOXEL
+{
+	int(8) POS_X;
+	int(8) POS_Y;
+	int(8) POS_Z;
+	byte COLOR_INDEX;
+}
+
+class nTRN(id) as Chunk("nTRN")
+{
+	int(32) nodeId;
+	@args.id = nodeId;
+	DICT nodeAttribs;
+	int(32) childNodeId;
+	int(32) reservedId;
+	int(32) layerId;
+	int(32) numFrames;
+	DICT frames[numFrames];
+}
+
+class nGRP(id) as Chunk("nGRP")
+{
+	int(32) nodeId;
+	@args.id = nodeId;
+	DICT nodeAttribs;
+	int(32) nodeChildrenNodes;
+	int(32) childNodes[nodeChildrenNodes];
+}
+
+class nSHP(id) as Chunk("nSHP")
+{
+	int(32) nodeId;
+	@args.id = nodeId;
+	DICT nodeAttribs;
+	int(32) numModels;
+	MODEL models[numModels];
+}
+
+class MODEL(id)
+{
+	int(32) modelId;
+	@args.id = modelId;
+	DICT modelAttribs;
+}
+
+class DICT
+{
+	int(32) count;
+	DICT_ITEM keys[count];
+}
+
+class DICT_ITEM
+{
+	DICT_STRING key;
+	DICT_STRING value;
+}
+
+class DICT_STRING
+{
+	int(32) bufferSize;
+	byte buffer[bufferSize];
+}
+
+class MATERIAL_V2(id) as Chunk("MATL")
+{
+	int(32) materialId;
+	@args.id = materialId;
+	DICT properties;
+}
+
+class MATERIAL_V1(id) as Chunk("MATT")
+{
+	int(32) materialId;
+	@args.id = materialId;
+	int(32) materialType;
+	float(32) materialWeight;
+	int(32) propertyBits;
+	float(32) propertiesNormalized;
+}
