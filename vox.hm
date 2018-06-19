@@ -36,6 +36,7 @@ class SIZE as Chunk("SIZE")
 class XYZI as Chunk("XYZI")
 {
 	int(32) numVoxels;
+	@value = "numVoxels: "+%str(numVoxels);
 	VOXEL voxels[numVoxels];
 }
 
@@ -115,12 +116,13 @@ class DICT_ITEM
 {
 	DICT_STRING key;
 	DICT_STRING value;
+	@value = key.buffer+": "+value.buffer;
 }
 
 class DICT_STRING
 {
 	int(32) bufferSize;
-	byte buffer[bufferSize];
+	String(bufferSize) buffer;
 }
 
 class MATERIAL_V2(id) as Chunk("MATL")
@@ -138,4 +140,9 @@ class MATERIAL_V1(id) as Chunk("MATT")
 	float(32) materialWeight;
 	int(32) propertyBits;
 	float(32) propertiesNormalized;
+}
+
+class rOBJ(id) as Chunk("rOBJ")
+{
+	DICT properties;
 }
