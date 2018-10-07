@@ -319,6 +319,32 @@ namespace vox
 
 	//////////////////////////////////////////////////////////////////
 	
+	RGBA::RGBA()
+	{
+		
+	}
+
+	void RGBA::write(FILE *fp)
+	{
+		// chunk header
+		int32_t id = GetMVID('R', 'G', 'B', 'A');
+		fwrite(&id, sizeof(int32_t), 1, fp);
+		size_t contentSize = getSize();
+		fwrite(&contentSize, sizeof(int32_t), 1, fp);
+		size_t childSize = 0;
+		fwrite(&childSize, sizeof(int32_t), 1, fp);
+
+		// datas's
+		fwrite(colors, sizeof(uint8_t), contentSize, fp);
+	}
+
+	size_t RGBA::getSize()
+	{
+		return sizeof(uint8_t) * 4 * 256;
+	}
+	
+	//////////////////////////////////////////////////////////////////
+	
 	VoxCube::VoxCube()
 	{
 		id = 0;
@@ -619,6 +645,24 @@ namespace vox
 				layr.write(m_File);
 			}*/
 
+			// RGBA Palette
+			if (colors.size() > 0)
+			{
+				RGBA palette;
+				for (int i = 0; i < 255; i++)
+				{
+					if (i < colors.size())
+					{
+						palette.colors[i] = colors[i];
+					}
+					else
+					{
+						palette.colors[i] = 0;
+					}
+				}
+				palette.write(m_File);
+			}
+			
 			const long mainChildChunkSize = GetFilePos() - headerSize;
 			SetFilePos(numBytesMainChunkPos);
 			uint32_t size = (uint32_t)mainChildChunkSize;
