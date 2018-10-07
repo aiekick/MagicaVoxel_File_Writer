@@ -161,6 +161,15 @@ namespace vox
 		size_t getSize();
 	};
 
+	struct RGBA
+	{
+		int32_t colors[256];
+
+		RGBA();
+		void write(FILE *fp);
+		size_t getSize();
+	};	
+
 	struct VoxCube
 	{
 		int id;
