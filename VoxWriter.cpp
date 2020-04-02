@@ -366,7 +366,8 @@ namespace vox
 
 	//////////////////////////////////////////////////////////////////
 
-	VoxWriter* VoxWriter::Create(std::string vFilePathName, int vLimitX, int vLimitY, int vLimitZ, errno_t *vError)
+	VoxWriter* VoxWriter::Create(const std::string& vFilePathName, const uint32_t& vLimitX,
+		const uint32_t& vLimitY, const uint32_t& vLimitZ, int32_t *vError)
 	{
 		VoxWriter * vox = new VoxWriter(vLimitX, vLimitY, vLimitZ);
 
@@ -386,7 +387,7 @@ namespace vox
 		return vox;
 	}
 
-	std::string VoxWriter::GetErrnoMsg(errno_t vError)
+	std::string VoxWriter::GetErrnoMsg(const int32_t& vError)
 	{
 		std::string res;
 
@@ -478,7 +479,7 @@ namespace vox
 	//////////////////////////////////////////////////////////////////
 	// the limit of magicavoxel is 127 for one cube, is 127 voxels (indexs : 0 -> 126)
 	// vMaxVoxelPerCubeX,Y,Z define the limit of one cube
-	VoxWriter::VoxWriter(const uint32_t& vMaxVoxelPerCubeX, const uint32_t& vMaxVoxelPerCubeY, const uint32_t& vMaxVoxelPerCubeZ)
+	VoxWriter::VoxWriter(int32_t vMaxVoxelPerCubeX, int32_t vMaxVoxelPerCubeY, int32_t vMaxVoxelPerCubeZ)
 	{
 		MV_VERSION = 150; // the old version of MV not open another file than if version is 150 (answer by @ephtracy
 
@@ -501,9 +502,9 @@ namespace vox
 		// the limit of magicavoxel is 127 because the first is 1 not 0
 		// so this is 0 to 126
 		// index limit, size is 127
-		m_MaxVoxelPerCubeX = ct::mini<int32_t>(vMaxVoxelPerCubeX, 126);
-		m_MaxVoxelPerCubeY = ct::mini<int32_t>(vMaxVoxelPerCubeY, 126);
-		m_MaxVoxelPerCubeZ = ct::mini<int32_t>(vMaxVoxelPerCubeZ, 126);
+		m_MaxVoxelPerCubeX = ct::clamp<int32_t>(vMaxVoxelPerCubeX, 0, 126);
+		m_MaxVoxelPerCubeY = ct::clamp<int32_t>(vMaxVoxelPerCubeY, 0, 126);
+		m_MaxVoxelPerCubeZ = ct::clamp<int32_t>(vMaxVoxelPerCubeZ, 0, 126);
 
 		maxVolume.lowerBound = 1e7f;
 		maxVolume.upperBound = 0.0f;
@@ -514,7 +515,7 @@ namespace vox
 
 	}
 
-	errno_t VoxWriter::IsOk(std::string vFilePathName)
+    int32_t VoxWriter::IsOk(const std::string& vFilePathName)
 	{
 		if (OpenFileForWriting(vFilePathName))
 		{
@@ -543,7 +544,7 @@ namespace vox
 	void VoxWriter::AddVoxel(const int32_t& vX, const int32_t& vY, const int32_t& vZ, const uint8_t& vColorIndex)
 	{
 		// cube pos
-		int32_t ox =(int32_t)std::floor((double)vX / (double)m_MaxVoxelPerCubeX);
+		int32_t ox = (int32_t)std::floor((double)vX / (double)m_MaxVoxelPerCubeX);
 		int32_t oy = (int32_t)std::floor((double)vY / (double)m_MaxVoxelPerCubeY);
 		int32_t oz = (int32_t)std::floor((double)vZ / (double)m_MaxVoxelPerCubeZ);
 		
@@ -556,7 +557,7 @@ namespace vox
 		MergeVoxelInCube(vX, vY, vZ, vColorIndex, cube);
 	}
 
-	void VoxWriter::SaveToFile(std::string vFilePathName)
+	void VoxWriter::SaveToFile(const std::string& vFilePathName)
 	{
 		if (OpenFileForWriting(vFilePathName))
 		{
@@ -599,9 +600,9 @@ namespace vox
 				trans.childNodeId = ++nodeIds;
 				trans.layerId = 0;
 				
-				c->tx = (int)floor((c->tx - minCubeX + 0.5f) * m_MaxVoxelPerCubeX - maxVolume.lowerBound.x - maxVolume.Size().x * 0.5);
-				c->ty = (int)floor((c->ty - minCubeY + 0.5f) * m_MaxVoxelPerCubeY - maxVolume.lowerBound.y - maxVolume.Size().y * 0.5);
-				c->tz = (int)floor((c->tz - minCubeZ + 0.5f) * m_MaxVoxelPerCubeZ);
+				c->tx = (int)std::floor((c->tx - minCubeX + 0.5f) * m_MaxVoxelPerCubeX - maxVolume.lowerBound.x - maxVolume.Size().x * 0.5);
+				c->ty = (int)std::floor((c->ty - minCubeY + 0.5f) * m_MaxVoxelPerCubeY - maxVolume.lowerBound.y - maxVolume.Size().y * 0.5);
+				c->tz = (int)std::floor((c->tz - minCubeZ + 0.5f) * m_MaxVoxelPerCubeZ);
 				
 				// not an animation in my case so only first frame frames[0]
 				trans.frames[0].Add("_t", ct::toStr(c->tx) + " " + ct::toStr(c->ty) + " " + ct::toStr(c->tz));
@@ -668,9 +669,14 @@ namespace vox
 		return (a) | (b << 8) | (c << 16) | (d << 24);
 	}
 
-	bool VoxWriter::OpenFileForWriting(std::string vFilePathName)
+	bool VoxWriter::OpenFileForWriting(const std::string& vFilePathName)
 	{
+#ifdef MSVC
 		lastError = fopen_s(&m_File, vFilePathName.c_str(), "wb");
+#else
+        m_File = fopen(vFilePathName.c_str(), "wb");
+        lastError = errno;
+#endif
 		if (lastError != 0)
 			return false;
 		return true;
@@ -686,7 +692,7 @@ namespace vox
 		return ftell(m_File);
 	}
 
-	void VoxWriter::SetFilePos(long vPos)
+	void VoxWriter::SetFilePos(const long& vPos)
 	{
 		//  SEEK_SET	Beginning of file
 		//  SEEK_CUR	Current position of the file pointer
@@ -716,22 +722,29 @@ namespace vox
 	{
 		maxVolume.Combine(ct::dvec3((double)vX, (double)vY, (double)vZ));
 
+		bool exist = false;
+
 		if (voxelId.find(vX) != voxelId.end())
 		{
 			if (voxelId[vX].find(vY) != voxelId[vX].end())
 			{
 				if (voxelId[vX][vY].find(vZ) != voxelId[vX][vY].end())
 				{
-					vCube->xyzi.voxels.push_back((uint8_t)(vX % m_MaxVoxelPerCubeX)); // x
-					vCube->xyzi.voxels.push_back((uint8_t)(vY % m_MaxVoxelPerCubeY)); // y
-					vCube->xyzi.voxels.push_back((uint8_t)(vZ % m_MaxVoxelPerCubeZ)); // z
-
-					// correspond a la loc de la couleur du voxel en question
-					voxelId[vX][vY][vZ] = vCube->xyzi.voxels.size();
-
-					vCube->xyzi.voxels.push_back(vColorIndex); // color index
+					exist = true;
 				}
 			}
+		}
+
+		if (exist == false)
+		{
+			vCube->xyzi.voxels.push_back((uint8_t)(vX % m_MaxVoxelPerCubeX)); // x
+			vCube->xyzi.voxels.push_back((uint8_t)(vY % m_MaxVoxelPerCubeY)); // y
+			vCube->xyzi.voxels.push_back((uint8_t)(vZ % m_MaxVoxelPerCubeZ)); // z
+
+			// correspond a la loc de la couleur du voxel en question
+			voxelId[vX][vY][vZ] = vCube->xyzi.voxels.size();
+
+			vCube->xyzi.voxels.push_back(vColorIndex); // color index
 		}
 	}
 

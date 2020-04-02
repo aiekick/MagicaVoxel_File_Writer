@@ -5,10 +5,15 @@ cmake_policy(SET CMP0012 NEW)
 cmake_policy(SET CMP0023 NEW)
 
 set(PROJECT VoxWriter)
-
-enable_language(C CXX)
-
 project(${PROJECT} CXX)
+
+enable_language(CXX)
+
+if(MSVC)
+    add_definitions(-DMSVC)
+endif()
+
+add_definitions(-std=c++11)
 
 add_executable(${PROJECT} main.cpp VoxWriter.cpp VoxWriter.h)
 
