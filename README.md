@@ -1,7 +1,4 @@
-# MagicaVoxel_File_Writer
+# Animation generation prototype.
 
-the extra tools like cAABBCC you see somewhere is the code, can be found in my repo here : https://github.com/aiekick/cTools
-
-vox.hm is the file format descriptor for HexaMonkey :
-- original topic about it : https://github.com/ephtracy/voxel-model/issues/19
-- HexaMonkey tool : http://hexamonkey.com/
+need to be tested when the animation will come back in MV
+for the moment, in MagicaVoxel 99.4.2 animations is deactivated
