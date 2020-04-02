@@ -356,6 +356,7 @@ namespace vox
 		tx = 0;
 		ty = 0;
 		tz = 0;
+		frame = 0;
 	}
 
 	void VoxCube::write(FILE *fp)
@@ -494,6 +495,7 @@ namespace vox
 		ID_NSHP = GetID('n', 'S', 'H', 'P');
 
 		maxCubeId = 0;
+		maxFrames = 0;
 
 		minCubeX = (int)1e7;
 		minCubeY = (int)1e7;
@@ -541,7 +543,7 @@ namespace vox
 		colors[index] = GetID(r, g, b, a);
 	}
 
-	void VoxWriter::AddVoxel(const int32_t& vX, const int32_t& vY, const int32_t& vZ, const uint8_t& vColorIndex)
+	void VoxWriter::AddVoxel(const int32_t& vX, const int32_t& vY, const int32_t& vZ, const uint8_t& vColorIndex, const int32_t& vFrame)
 	{
 		// cube pos
 		int32_t ox = (int32_t)std::floor((double)vX / (double)m_MaxVoxelPerCubeX);
@@ -552,9 +554,9 @@ namespace vox
 		minCubeY = ct::mini<int32_t>(minCubeX, oy);
 		minCubeZ = ct::mini<int32_t>(minCubeX, oz);
 
-		auto cube = GetCube(ox, oy, oz);
+		auto cube = GetCube(ox, oy, oz, vFrame);
 
-		MergeVoxelInCube(vX, vY, vZ, vColorIndex, cube);
+		MergeVoxelInCube(vX, vY, vZ, vColorIndex, cube, vFrame);
 	}
 
 	void VoxWriter::SaveToFile(const std::string& vFilePathName)
@@ -594,7 +596,7 @@ namespace vox
 				
 				c->write(m_File);
 				
-				nTRN trans(1);
+				nTRN trans(maxFrames);
 				trans.nodeId = ++nodeIds; //
 				rootGroup.childNodes[i] = nodeIds;
 				trans.childNodeId = ++nodeIds;
@@ -604,8 +606,7 @@ namespace vox
 				c->ty = (int)std::floor((c->ty - minCubeY + 0.5f) * m_MaxVoxelPerCubeY - maxVolume.lowerBound.y - maxVolume.Size().y * 0.5);
 				c->tz = (int)std::floor((c->tz - minCubeZ + 0.5f) * m_MaxVoxelPerCubeZ);
 				
-				// not an animation in my case so only first frame frames[0]
-				trans.frames[0].Add("_t", ct::toStr(c->tx) + " " + ct::toStr(c->ty) + " " + ct::toStr(c->tz));
+				trans.frames[c->frame].Add("_t", ct::toStr(c->tx) + " " + ct::toStr(c->ty) + " " + ct::toStr(c->tz));
 				
 				shapeTransforms.push_back(trans);
 
@@ -700,37 +701,46 @@ namespace vox
 		fseek(m_File, vPos, SEEK_SET);
 	}
 
-	int32_t VoxWriter::GetCubeId(const int32_t& vX, const int32_t& vY, const int32_t& vZ)
+	int32_t VoxWriter::GetCubeId(const int32_t& vX, const int32_t& vY, const int32_t& vZ, const int32_t& vFrame)
 	{
-		if (cubesId.find(vX) != cubesId.end())
+		if (cubeId.find(vFrame) != cubeId.end())
 		{
-			if (cubesId[vX].find(vY) != cubesId[vX].end())
+			if (cubeId[vFrame].find(vX) != cubeId[vFrame].end())
 			{
-				if (cubesId[vX][vY].find(vZ) != cubesId[vX][vY].end())
+				if (cubeId[vFrame][vX].find(vY) != cubeId[vFrame][vX].end())
 				{
-					return cubesId[vX][vY][vZ];
+					if (cubeId[vFrame][vX][vY].find(vZ) != cubeId[vFrame][vX][vY].end())
+					{
+						return cubeId[vFrame][vX][vY][vZ];
+					}
 				}
 			}
 		}
+		
 
-		cubesId[vX][vY][vZ] = maxCubeId++;
+		cubeId[vFrame][vX][vY][vZ] = maxCubeId++;
 
-		return cubesId[vX][vY][vZ];
+		return cubeId[vX][vX][vY][vZ];
 	}
 
-	void VoxWriter::MergeVoxelInCube(const int32_t& vX, const int32_t& vY, const int32_t& vZ, const uint8_t& vColorIndex, VoxCube *vCube)
+	void VoxWriter::MergeVoxelInCube(
+		const int32_t& vX, const int32_t& vY, const int32_t& vZ,
+		const uint8_t& vColorIndex, VoxCube *vCube, const int32_t& vFrame)
 	{
 		maxVolume.Combine(ct::dvec3((double)vX, (double)vY, (double)vZ));
 
 		bool exist = false;
 
-		if (voxelId.find(vX) != voxelId.end())
+		if (voxelId.find(vFrame) != voxelId.end())
 		{
-			if (voxelId[vX].find(vY) != voxelId[vX].end())
+			if (voxelId[vFrame].find(vX) != voxelId[vFrame].end())
 			{
-				if (voxelId[vX][vY].find(vZ) != voxelId[vX][vY].end())
+				if (voxelId[vFrame][vX].find(vY) != voxelId[vFrame][vX].end())
 				{
-					exist = true;
+					if (voxelId[vFrame][vX][vY].find(vZ) != voxelId[vFrame][vX][vY].end())
+					{
+						exist = true;
+					}
 				}
 			}
 		}
@@ -742,15 +752,15 @@ namespace vox
 			vCube->xyzi.voxels.push_back((uint8_t)(vZ % m_MaxVoxelPerCubeZ)); // z
 
 			// correspond a la loc de la couleur du voxel en question
-			voxelId[vX][vY][vZ] = vCube->xyzi.voxels.size();
+			voxelId[vFrame][vX][vY][vZ] = vCube->xyzi.voxels.size();
 
 			vCube->xyzi.voxels.push_back(vColorIndex); // color index
 		}
 	}
 
-	VoxCube* VoxWriter::GetCube(const int32_t& vX, const int32_t& vY, const int32_t& vZ)
+	VoxCube* VoxWriter::GetCube(const int32_t& vX, const int32_t& vY, const int32_t& vZ, const int32_t& vFrame)
 	{
-		int32_t id = GetCubeId(vX, vY, vZ);
+		int32_t id = GetCubeId(vX, vY, vZ, vFrame);
 
 		if (id == cubes.size())
 		{
@@ -765,6 +775,11 @@ namespace vox
 			c.size.sizex = m_MaxVoxelPerCubeX + 1;
 			c.size.sizey = m_MaxVoxelPerCubeY + 1;
 			c.size.sizez = m_MaxVoxelPerCubeZ + 1;
+
+			c.frame = vFrame;
+
+			int32_t f = vFrame + 1;
+			maxFrames = ct::maxi(maxFrames, f);
 
 			cubes.push_back(c);
 		}

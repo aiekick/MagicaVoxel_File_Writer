@@ -341,6 +341,8 @@ namespace vox
 
 		XYZI xyzi;
 
+		int32_t frame;
+
 		VoxCube();
 
 		void write(FILE *fp);
@@ -365,11 +367,14 @@ namespace vox
 		std::vector<uint32_t> colors;
 		std::vector<VoxCube> cubes;
 		int32_t maxCubeId;
+		int32_t maxFrames;
 		int32_t minCubeX;
 		int32_t minCubeY;
 		int32_t minCubeZ;
-		std::map<int32_t, std::map<int32_t, std::map<int32_t, int32_t>>> cubesId;
-		std::map<int32_t, std::map<int32_t, std::map<int32_t, int32_t>>> voxelId;
+		//frame, x, y, z, cubeId
+		std::map <int32_t, std::map<int32_t, std::map<int32_t, std::map<int32_t, int32_t>>>> cubeId;
+		//frame, x, y, z, voxelId
+		std::map <int32_t, std::map<int32_t, std::map<int32_t, std::map<int32_t, int32_t>>>> voxelId;
 
 		int32_t lastError;
 
@@ -380,7 +385,7 @@ namespace vox
 		void ClearVoxels();
 		void ClearColors();
 		void AddColor(const uint8_t& r, const uint8_t& g, const uint8_t& b, const uint8_t& a, const uint8_t& index);
-		void AddVoxel(const int32_t& vX, const int32_t& vY, const int32_t& vZ, const uint8_t& vColorIndex);
+		void AddVoxel(const int32_t& vX, const int32_t& vY, const int32_t& vZ, const uint8_t& vColorIndex, const int32_t& vFrame = 0);
 		void SaveToFile(const std::string& vFilePathName);
 		
 	private:
@@ -389,9 +394,10 @@ namespace vox
 		void CloseFile();
 		long GetFilePos();
 		void SetFilePos(const long& vPos);
-		int32_t GetCubeId(const int32_t& vX, const int32_t& vY, const int32_t& vZ);
-		VoxCube* GetCube(const int32_t& vX, const int32_t& vY, const int32_t& vZ);
-		void MergeVoxelInCube(const int32_t& vX, const int32_t& vY, const int32_t& vZ, const uint8_t& vColorIndex, VoxCube *vCube);
+		int32_t GetCubeId(const int32_t& vX, const int32_t& vY, const int32_t& vZ, const int32_t& vFrame);
+		VoxCube* GetCube(const int32_t& vX, const int32_t& vY, const int32_t& vZ, const int32_t& vFrame);
+		void MergeVoxelInCube(const int32_t& vX, const int32_t& vY, const int32_t& vZ, 
+			const uint8_t& vColorIndex, VoxCube *vCube, const int32_t& vFrame = 0);
 	};
 }
 #endif //__VOX_WRITER_H__
