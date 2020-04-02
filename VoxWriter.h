@@ -464,58 +464,58 @@ namespace vox
 	class VoxWriter
 	{
 	public:
-		static VoxWriter* Create(std::string vFilePathName, int vLimitX, int vLimitY, int vLimitZ, errno_t *vError);
+		static VoxWriter* Create(std::string vFilePathName, int32_t vLimitX, int32_t vLimitY, int32_t vLimitZ, errno_t *vError);
 		static std::string GetErrnoMsg(errno_t vError);
 
 	private:
-		int MV_VERSION;
+		int32_t MV_VERSION;
 
-		int ID_VOX;
-		int ID_PACK;
-		int ID_MAIN;
-		int ID_SIZE;
-		int ID_XYZI;
-		int ID_RGBA;
-		int ID_NTRN;
-		int ID_NGRP;
-		int ID_NSHP;
+		int32_t ID_VOX;
+		int32_t ID_PACK;
+		int32_t ID_MAIN;
+		int32_t ID_SIZE;
+		int32_t ID_XYZI;
+		int32_t ID_RGBA;
+		int32_t ID_NTRN;
+		int32_t ID_NGRP;
+		int32_t ID_NSHP;
 
-		int m_MaxVoxelPerCubeX;
-		int m_MaxVoxelPerCubeY;
-		int m_MaxVoxelPerCubeZ;
+		int32_t m_MaxVoxelPerCubeX;
+		int32_t m_MaxVoxelPerCubeY;
+		int32_t m_MaxVoxelPerCubeZ;
 
 		FILE * m_File;
 		ct::dAABBCC maxVolume;
 		std::vector<uint32_t> colors;
 		std::vector<VoxCube> cubes;
-		int maxCubeId;
-		int minCubeX;
-		int minCubeY;
-		int minCubeZ;
-		std::map<int, std::map<int, std::map<int, int>>> cubesId;
-		std::map<int, std::map<int, std::map<int, int>>> voxelId;
+		int32_t maxCubeId;
+		int32_t minCubeX;
+		int32_t minCubeY;
+		int32_t minCubeZ;
+		std::map<int32_t, std::map<int32_t, std::map<int32_t, int32_t>>> cubesId;
+		std::map<int32_t, std::map<int32_t, std::map<int32_t, int32_t>>> voxelId;
 
 		errno_t lastError;
 
 	public:
-		VoxWriter(int vLimitX = 126, int vLimitY = 126, int vLimitZ = 126);
+		VoxWriter(const uint32_t& vLimitX = 126, const uint32_t& vLimitY = 126, const uint32_t& vLimitZ = 126);
 		~VoxWriter();
 		errno_t IsOk(std::string vFilePathName);
 		void ClearVoxels();
 		void ClearColors();
-		void AddColor(uint8_t r, uint8_t g, uint8_t b, uint8_t a, uint8_t index);
-		void AddVoxel(uint32_t vX, uint32_t vY, uint32_t vZ, uint8_t vColorIndex);
+		void AddColor(const uint8_t& r, const uint8_t& g, const uint8_t& b, const uint8_t& a, const uint8_t& index);
+		void AddVoxel(const int32_t& vX, const int32_t& vY, const int32_t& vZ, const uint8_t& vColorIndex);
 		void SaveToFile(std::string vFilePathName);
 		
 	private:
-		uint32_t GetID(uint8_t a, uint8_t b, uint8_t c, uint8_t d);
+		uint32_t GetID(const uint8_t& a, const uint8_t& b, const uint8_t& c, const uint8_t& d);
 		bool OpenFileForWriting(std::string vFilePathName);
 		void CloseFile();
 		long GetFilePos();
 		void SetFilePos(long vPos);
-		int GetCubeId(int vX, int vY, int vZ);
-		VoxCube* GetCube(int vX, int vY, int vZ);
-		void MergeVoxelInCube(uint32_t vX, uint32_t vY, uint32_t vZ, uint32_t vColorIndex, VoxCube *vCube);
+		int32_t GetCubeId(const int32_t& vX, const int32_t& vY, const int32_t& vZ);
+		VoxCube* GetCube(const int32_t& vX, const int32_t& vY, const int32_t& vZ);
+		void MergeVoxelInCube(const int32_t& vX, const int32_t& vY, const int32_t& vZ, const uint8_t& vColorIndex, VoxCube *vCube);
 	};
 }
 #endif //__VOX_WRITER_H__

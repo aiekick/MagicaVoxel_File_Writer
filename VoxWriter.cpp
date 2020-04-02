@@ -116,7 +116,7 @@ namespace vox
 		numFrames = 1;
 		layerId = -1;
 		numFrames = countFrames;
-		while (frames.size() < numFrames)
+		while ((int32_t)frames.size() < numFrames)
 			frames.push_back(DICT());
 	}
 
@@ -155,7 +155,7 @@ namespace vox
 	{
 		nodeId = 0;
 		nodeChildrenNodes = vCount;
-		while (childNodes.size() < nodeChildrenNodes)
+		while ((int32_t)childNodes.size() < nodeChildrenNodes)
 			childNodes.push_back(0);
 	}
 
@@ -205,7 +205,7 @@ namespace vox
 	{
 		nodeId = 0;
 		numModels = vCount;
-		while (models.size() < numModels)
+		while ((int32_t)models.size() < numModels)
 			models.push_back(MODEL());
 	}
 	
@@ -478,7 +478,7 @@ namespace vox
 	//////////////////////////////////////////////////////////////////
 	// the limit of magicavoxel is 127 for one cube, is 127 voxels (indexs : 0 -> 126)
 	// vMaxVoxelPerCubeX,Y,Z define the limit of one cube
-	VoxWriter::VoxWriter(int vMaxVoxelPerCubeX, int vMaxVoxelPerCubeY, int vMaxVoxelPerCubeZ)
+	VoxWriter::VoxWriter(const uint32_t& vMaxVoxelPerCubeX, const uint32_t& vMaxVoxelPerCubeY, const uint32_t& vMaxVoxelPerCubeZ)
 	{
 		MV_VERSION = 150; // the old version of MV not open another file than if version is 150 (answer by @ephtracy
 
@@ -501,9 +501,9 @@ namespace vox
 		// the limit of magicavoxel is 127 because the first is 1 not 0
 		// so this is 0 to 126
 		// index limit, size is 127
-		m_MaxVoxelPerCubeX = ct::mini(vMaxVoxelPerCubeX, 126);
-		m_MaxVoxelPerCubeY = ct::mini(vMaxVoxelPerCubeY, 126);
-		m_MaxVoxelPerCubeZ = ct::mini(vMaxVoxelPerCubeZ, 126);
+		m_MaxVoxelPerCubeX = ct::mini<int32_t>(vMaxVoxelPerCubeX, 126);
+		m_MaxVoxelPerCubeY = ct::mini<int32_t>(vMaxVoxelPerCubeY, 126);
+		m_MaxVoxelPerCubeZ = ct::mini<int32_t>(vMaxVoxelPerCubeZ, 126);
 
 		maxVolume.lowerBound = 1e7f;
 		maxVolume.upperBound = 0.0f;
@@ -533,23 +533,23 @@ namespace vox
 
 	}
 
-	void VoxWriter::AddColor(uint8_t r, uint8_t g, uint8_t b, uint8_t a, uint8_t index)
+	void VoxWriter::AddColor(const uint8_t& r, const uint8_t& g, const uint8_t& b, const uint8_t& a, const uint8_t& index)
 	{
 		while (colors.size() <= index)
 			colors.push_back(0);
 		colors[index] = GetID(r, g, b, a);
 	}
 
-	void VoxWriter::AddVoxel(uint32_t vX, uint32_t vY, uint32_t vZ, uint8_t vColorIndex)
+	void VoxWriter::AddVoxel(const int32_t& vX, const int32_t& vY, const int32_t& vZ, const uint8_t& vColorIndex)
 	{
 		// cube pos
-		int ox =(int)std::floor((double)vX / (double)m_MaxVoxelPerCubeX);
-		int oy = (int)std::floor((double)vY / (double)m_MaxVoxelPerCubeY);
-		int oz = (int)std::floor((double)vZ / (double)m_MaxVoxelPerCubeZ);
+		int32_t ox =(int32_t)std::floor((double)vX / (double)m_MaxVoxelPerCubeX);
+		int32_t oy = (int32_t)std::floor((double)vY / (double)m_MaxVoxelPerCubeY);
+		int32_t oz = (int32_t)std::floor((double)vZ / (double)m_MaxVoxelPerCubeZ);
 		
-		minCubeX = ct::mini<int>(minCubeX, ox);
-		minCubeY = ct::mini<int>(minCubeX, oy);
-		minCubeZ = ct::mini<int>(minCubeX, oz);
+		minCubeX = ct::mini<int32_t>(minCubeX, ox);
+		minCubeY = ct::mini<int32_t>(minCubeX, oy);
+		minCubeZ = ct::mini<int32_t>(minCubeX, oz);
 
 		auto cube = GetCube(ox, oy, oz);
 
@@ -599,16 +599,10 @@ namespace vox
 				trans.childNodeId = ++nodeIds;
 				trans.layerId = 0;
 				
-				int limX = m_MaxVoxelPerCubeX;
-				int limY = m_MaxVoxelPerCubeY;
-				int limZ = m_MaxVoxelPerCubeZ;
+				c->tx = (int)floor((c->tx - minCubeX + 0.5f) * m_MaxVoxelPerCubeX - maxVolume.lowerBound.x - maxVolume.Size().x * 0.5);
+				c->ty = (int)floor((c->ty - minCubeY + 0.5f) * m_MaxVoxelPerCubeY - maxVolume.lowerBound.y - maxVolume.Size().y * 0.5);
+				c->tz = (int)floor((c->tz - minCubeZ + 0.5f) * m_MaxVoxelPerCubeZ);
 				
-				c->tx = (int)((c->tx - minCubeX + 0.5f) * limX);
-				c->ty = (int)((c->ty - minCubeY + 0.5f) * limY);
-				c->tz = (int)((c->tz - minCubeZ + 0.5f) * limZ);
-				c->tx = c->tx + (int)(maxVolume.lowerBound.x - maxVolume.Size().x * 0.5);
-				c->ty = c->ty + (int)(maxVolume.lowerBound.y - maxVolume.Size().y * 0.5);
-
 				// not an animation in my case so only first frame frames[0]
 				trans.frames[0].Add("_t", ct::toStr(c->tx) + " " + ct::toStr(c->ty) + " " + ct::toStr(c->tz));
 				
@@ -645,9 +639,9 @@ namespace vox
 			if (colors.size() > 0)
 			{
 				RGBA palette;
-				for (int i = 0; i < 255; i++)
+				for (int32_t i = 0; i < 255; i++)
 				{
-					if (i < colors.size())
+					if (i < (int32_t)colors.size())
 					{
 						palette.colors[i] = colors[i];
 					}
@@ -669,7 +663,7 @@ namespace vox
 		}
 	}
 
-	uint32_t VoxWriter::GetID(uint8_t a, uint8_t b, uint8_t c, uint8_t d)
+	uint32_t VoxWriter::GetID(const uint8_t& a, const uint8_t& b, const uint8_t& c, const uint8_t& d)
 	{
 		return (a) | (b << 8) | (c << 16) | (d << 24);
 	}
@@ -700,7 +694,7 @@ namespace vox
 		fseek(m_File, vPos, SEEK_SET);
 	}
 
-	int VoxWriter::GetCubeId(int vX, int vY, int vZ)
+	int32_t VoxWriter::GetCubeId(const int32_t& vX, const int32_t& vY, const int32_t& vZ)
 	{
 		if (cubesId.find(vX) != cubesId.end())
 		{
@@ -718,11 +712,9 @@ namespace vox
 		return cubesId[vX][vY][vZ];
 	}
 
-	void VoxWriter::MergeVoxelInCube(uint32_t vX, uint32_t vY, uint32_t vZ, uint32_t vColorIndex, VoxCube *vCube)
+	void VoxWriter::MergeVoxelInCube(const int32_t& vX, const int32_t& vY, const int32_t& vZ, const uint8_t& vColorIndex, VoxCube *vCube)
 	{
 		maxVolume.Combine(ct::dvec3((double)vX, (double)vY, (double)vZ));
-
-		bool exist = false;
 
 		if (voxelId.find(vX) != voxelId.end())
 		{
@@ -730,32 +722,22 @@ namespace vox
 			{
 				if (voxelId[vX][vY].find(vZ) != voxelId[vX][vY].end())
 				{
-					exist = true;
+					vCube->xyzi.voxels.push_back((uint8_t)(vX % m_MaxVoxelPerCubeX)); // x
+					vCube->xyzi.voxels.push_back((uint8_t)(vY % m_MaxVoxelPerCubeY)); // y
+					vCube->xyzi.voxels.push_back((uint8_t)(vZ % m_MaxVoxelPerCubeZ)); // z
+
+					// correspond a la loc de la couleur du voxel en question
+					voxelId[vX][vY][vZ] = vCube->xyzi.voxels.size();
+
+					vCube->xyzi.voxels.push_back(vColorIndex); // color index
 				}
 			}
 		}
-
-		if (!exist)
-		{
-			// voxel
-			uint8_t x = (uint8_t)(vX % m_MaxVoxelPerCubeX);
-			uint8_t y = (uint8_t)(vY % m_MaxVoxelPerCubeY);
-			uint8_t z = (uint8_t)(vZ % m_MaxVoxelPerCubeZ);
-
-			vCube->xyzi.voxels.push_back(x); // x
-			vCube->xyzi.voxels.push_back(y); // y
-			vCube->xyzi.voxels.push_back(z); // z
-		
-			// correspond a la loc de la couleur du voxel en question
-			voxelId[vX][vY][vZ] = vCube->xyzi.voxels.size(); 
-			
-			vCube->xyzi.voxels.push_back(vColorIndex); // color index
-		}
 	}
 
-	VoxCube* VoxWriter::GetCube(int vX, int vY, int vZ)
+	VoxCube* VoxWriter::GetCube(const int32_t& vX, const int32_t& vY, const int32_t& vZ)
 	{
-		int id = GetCubeId(vX, vY, vZ);
+		int32_t id = GetCubeId(vX, vY, vZ);
 
 		if (id == cubes.size())
 		{
@@ -774,7 +756,7 @@ namespace vox
 			cubes.push_back(c);
 		}
 
-		if (id < cubes.size())
+		if (id < (int32_t)cubes.size())
 		{
 			return &cubes[id];
 		}
