@@ -1,3 +1,6 @@
+// This is an independent project of an individual developer. Dear PVS-Studio, please check it.
+// PVS-Studio Static Code Analyzer for C, C++ and C#: http://www.viva64.com
+
 // Copyright 2018 Stephane Cuillerdier @Aiekick
 
 // Permission is hereby granted, free of charge, to any person obtaining a 
@@ -27,6 +30,8 @@
 
 #include "VoxWriter.h"
 #include <stdio.h> 
+
+//#define VERBOSE 
 
 namespace vox
 {
@@ -342,9 +347,9 @@ namespace vox
 	{
 		return sizeof(uint8_t) * 4 * 256;
 	}
-	
+
 	//////////////////////////////////////////////////////////////////
-	
+
 	VoxCube::VoxCube()
 	{
 		id = 0;
@@ -373,6 +378,8 @@ namespace vox
 		}
 		else
 		{
+			printf("Vox file creation failed, err : %s", GetErrnoMsg(*vError).c_str());
+
 			SAFE_DELETE(vox);
 		}
 
@@ -469,10 +476,11 @@ namespace vox
 	}
 
 	//////////////////////////////////////////////////////////////////
-
-	VoxWriter::VoxWriter(int vLimitX, int vLimitY, int vLimitZ)
+	// the limit of magicavoxel is 127 for one cube, is 127 voxels (indexs : 0 -> 126)
+	// vMaxVoxelPerCubeX,Y,Z define the limit of one cube
+	VoxWriter::VoxWriter(int vMaxVoxelPerCubeX, int vMaxVoxelPerCubeY, int vMaxVoxelPerCubeZ)
 	{
-		MV_VERSION = 150;
+		MV_VERSION = 150; // the old version of MV not open another file than if version is 150 (answer by @ephtracy
 
 		ID_VOX = GetID('V', 'O', 'X', ' ');
 		ID_PACK = GetID('P', 'A', 'C', 'K');
@@ -486,19 +494,16 @@ namespace vox
 
 		maxCubeId = 0;
 
-		minCubeX = (int)1e5;
-		minCubeY = (int)1e5;
-		minCubeZ = (int)1e5;
-
-		maxCubeX = (int)-1e5;
-		maxCubeY = (int)-1e5;
-		maxCubeZ = (int)-1e5;
+		minCubeX = (int)1e7;
+		minCubeY = (int)1e7;
+		minCubeZ = (int)1e7;
 		
 		// the limit of magicavoxel is 127 because the first is 1 not 0
 		// so this is 0 to 126
-		m_LimitX = min(vLimitX, 126);
-		m_LimitY = min(vLimitY, 126);
-		m_LimitZ = min(vLimitZ, 126);
+		// index limit, size is 127
+		m_MaxVoxelPerCubeX = ct::mini(vMaxVoxelPerCubeX, 126);
+		m_MaxVoxelPerCubeY = ct::mini(vMaxVoxelPerCubeY, 126);
+		m_MaxVoxelPerCubeZ = ct::mini(vMaxVoxelPerCubeZ, 126);
 
 		maxVolume.lowerBound = 1e7f;
 		maxVolume.upperBound = 0.0f;
@@ -525,7 +530,7 @@ namespace vox
 
 	void VoxWriter::ClearColors()
 	{
-		colors.clear();
+
 	}
 
 	void VoxWriter::AddColor(uint8_t r, uint8_t g, uint8_t b, uint8_t a, uint8_t index)
@@ -538,17 +543,13 @@ namespace vox
 	void VoxWriter::AddVoxel(uint32_t vX, uint32_t vY, uint32_t vZ, uint8_t vColorIndex)
 	{
 		// cube pos
-		int ox = (int)floor(vX / m_LimitX);
-		int oy = (int)floor(vY / m_LimitY);
-		int oz = (int)floor(vZ / m_LimitZ);
-
-		minCubeX = min<int>(minCubeX, ox);
-		minCubeY = min<int>(minCubeX, oy);
-		minCubeZ = min<int>(minCubeX, oz);
-
-		maxCubeX = max<int>(maxCubeX, ox + 1);
-		maxCubeY = max<int>(maxCubeX, oy + 1);
-		maxCubeZ = max<int>(maxCubeX, oz + 1);
+		int ox =(int)std::floor((double)vX / (double)m_MaxVoxelPerCubeX);
+		int oy = (int)std::floor((double)vY / (double)m_MaxVoxelPerCubeY);
+		int oz = (int)std::floor((double)vZ / (double)m_MaxVoxelPerCubeZ);
+		
+		minCubeX = ct::mini<int>(minCubeX, ox);
+		minCubeY = ct::mini<int>(minCubeX, oy);
+		minCubeZ = ct::mini<int>(minCubeX, oz);
 
 		auto cube = GetCube(ox, oy, oz);
 
@@ -559,13 +560,6 @@ namespace vox
 	{
 		if (OpenFileForWriting(vFilePathName))
 		{
-			//LogStr("----");
-			//LogStr("minCube " + toStr(minCubeX) + " " + toStr(minCubeY) + " " + toStr(minCubeZ));
-			//LogStr("maxVolume inf " + toStr(maxVolume.lowerBound.x) + " " + toStr(maxVolume.lowerBound.y) + " " + toStr(maxVolume.lowerBound.z));
-			//LogStr("maxVolume sup " + toStr(maxVolume.upperBound.x) + " " + toStr(maxVolume.upperBound.y) + " " + toStr(maxVolume.upperBound.z));
-			//LogStr("maxVolume size " + toStr(maxVolume.upperBound.x - maxVolume.lowerBound.x) + " " + toStr(maxVolume.upperBound.y - maxVolume.lowerBound.y) + " " + toStr(maxVolume.upperBound.z - maxVolume.lowerBound.z));
-			//LogStr("-----");
-
 			int32_t zero = 0;
 			
 			fwrite(&ID_VOX, sizeof(int32_t), 1, m_File);
@@ -605,16 +599,18 @@ namespace vox
 				trans.childNodeId = ++nodeIds;
 				trans.layerId = 0;
 				
-				int limX = m_LimitX;
-				int limY = m_LimitY;
-				int limZ = m_LimitZ;
+				int limX = m_MaxVoxelPerCubeX;
+				int limY = m_MaxVoxelPerCubeY;
+				int limZ = m_MaxVoxelPerCubeZ;
 				
-				c->tx = (int)((c->tx - minCubeX + 0.5f) * limX) - maxVolume.lowerBound.x - maxVolume.Size().x * 0.5f;
-				c->ty = (int)((c->ty - minCubeY + 0.5f) * limY) - maxVolume.lowerBound.y - maxVolume.Size().y * 0.5f;
+				c->tx = (int)((c->tx - minCubeX + 0.5f) * limX);
+				c->ty = (int)((c->ty - minCubeY + 0.5f) * limY);
 				c->tz = (int)((c->tz - minCubeZ + 0.5f) * limZ);
+				c->tx = c->tx + (int)(maxVolume.lowerBound.x - maxVolume.Size().x * 0.5);
+				c->ty = c->ty + (int)(maxVolume.lowerBound.y - maxVolume.Size().y * 0.5);
 
 				// not an animation in my case so only first frame frames[0]
-				trans.frames[0].Add("_t", toStr(c->tx) + " " + toStr(c->ty) + " " + toStr(c->tz));
+				trans.frames[0].Add("_t", ct::toStr(c->tx) + " " + ct::toStr(c->ty) + " " + ct::toStr(c->tz));
 				
 				shapeTransforms.push_back(trans);
 
@@ -641,7 +637,7 @@ namespace vox
 			{
 				LAYR layr;
 				layr.nodeId = i;
-				layr.nodeAttribs.Add("_name", toStr(i));
+				layr.nodeAttribs.Add("_name", ct::toStr(i));
 				layr.write(m_File);
 			}*/
 
@@ -660,9 +656,10 @@ namespace vox
 						palette.colors[i] = 0;
 					}
 				}
+
 				palette.write(m_File);
 			}
-			
+
 			const long mainChildChunkSize = GetFilePos() - headerSize;
 			SetFilePos(numBytesMainChunkPos);
 			uint32_t size = (uint32_t)mainChildChunkSize;
@@ -723,7 +720,7 @@ namespace vox
 
 	void VoxWriter::MergeVoxelInCube(uint32_t vX, uint32_t vY, uint32_t vZ, uint32_t vColorIndex, VoxCube *vCube)
 	{
-		maxVolume.Combine(cVec3((float)vX, (float)vY, (float)vZ));
+		maxVolume.Combine(ct::dvec3((double)vX, (double)vY, (double)vZ));
 
 		bool exist = false;
 
@@ -738,21 +735,13 @@ namespace vox
 			}
 		}
 
-		// voxel
-		uint8_t x = (uint8_t)(vX % m_LimitX);
-		uint8_t y = (uint8_t)(vY % m_LimitY);
-		uint8_t z = (uint8_t)(vZ % m_LimitZ);
-
-		vCube->size.sizex = cMax<int>(vCube->size.sizex, x);
-		vCube->size.sizey = cMax<int>(vCube->size.sizey, y);
-		vCube->size.sizez = cMax<int>(vCube->size.sizez, z);
-		
-		vCube->size.sizex = m_LimitX;
-		vCube->size.sizey = m_LimitY;
-		vCube->size.sizez = m_LimitZ;
-
-		if (exist == false)
+		if (!exist)
 		{
+			// voxel
+			uint8_t x = (uint8_t)(vX % m_MaxVoxelPerCubeX);
+			uint8_t y = (uint8_t)(vY % m_MaxVoxelPerCubeY);
+			uint8_t z = (uint8_t)(vZ % m_MaxVoxelPerCubeZ);
+
 			vCube->xyzi.voxels.push_back(x); // x
 			vCube->xyzi.voxels.push_back(y); // y
 			vCube->xyzi.voxels.push_back(z); // z
@@ -762,10 +751,6 @@ namespace vox
 			
 			vCube->xyzi.voxels.push_back(vColorIndex); // color index
 		}
-		/*else //if (exportColors)
-		{
-			// on va merger la couleur
-		}*/
 	}
 
 	VoxCube* VoxWriter::GetCube(int vX, int vY, int vZ)
@@ -782,11 +767,9 @@ namespace vox
 			c.ty = vY;
 			c.tz = vZ;
 
-			c.size.sizex = 0;
-			c.size.sizey = 0;
-			c.size.sizez = 0;
-
-			//LogStr("Cube " + toStr(id) + " : s " + toStr(c.size.sizex) + " " + toStr(c.size.sizey) + " " + toStr(c.size.sizez));
+			c.size.sizex = m_MaxVoxelPerCubeX + 1;
+			c.size.sizey = m_MaxVoxelPerCubeY + 1;
+			c.size.sizez = m_MaxVoxelPerCubeZ + 1;
 
 			cubes.push_back(c);
 		}
