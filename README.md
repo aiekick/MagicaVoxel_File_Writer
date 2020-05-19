@@ -8,7 +8,7 @@ vox.hm is the file format descriptor for HexaMonkey :
 
 the main.cpp file show you how to generate a quick file :
 
-With this simple code (thanks to [@unphased](https://github.com/aiekick/MagicaVoxel_File_Writer/issues/2) )
+With this simple code (thanks to @unphased)
 
 ```cpp
 #include "VoxWriter.h"
