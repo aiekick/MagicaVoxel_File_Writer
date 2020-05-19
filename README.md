@@ -8,7 +8,7 @@ vox.hm is the file format descriptor for HexaMonkey :
 
 ## Main.cpp
 
-the main cpp class let you create this file.
+the main cpp app let you create this file.
 
 this is the result in [Magicavoxel](https://ephtracy.github.io/)
 
