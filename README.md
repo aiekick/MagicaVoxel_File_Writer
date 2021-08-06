@@ -1,4 +1,4 @@
-# MagicaVoxel_File_Writer
+# MagicaVoxel File Writer
 
 vox.hm is the file format descriptor for HexaMonkey :
 - original topic about it : https://github.com/ephtracy/voxel-model/issues/19
