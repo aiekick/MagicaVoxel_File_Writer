@@ -1,5 +1,7 @@
 # MagicaVoxel File Writer
 
+Rust Version available here : [MagicaVoxel File Writer for Rust](https://github.com/aiekick/MagicaVoxel_File_Writer_for_Rust)
+
 vox.hm is the file format descriptor for HexaMonkey :
 - original topic about it : https://github.com/ephtracy/voxel-model/issues/19
 - HexaMonkey tool : http://hexamonkey.com/
