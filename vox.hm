@@ -63,7 +63,7 @@ class COLOR
 
 class IMAP as Chunk("IMAP")
 {
-	byte colorindex[256];
+	byte COLOR_INDEX_MAP[256];
 }
 
 class VOXEL
