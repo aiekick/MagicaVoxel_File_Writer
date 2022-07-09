@@ -61,6 +61,11 @@ class COLOR
 	byte alpha;
 }
 
+class IMAP as Chunk("IMAP")
+{
+	byte COLOR_INDEX_MAP[256];
+}
+
 class VOXEL
 {
 	int(8) POS_X;
