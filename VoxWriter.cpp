@@ -671,7 +671,7 @@ namespace vox
 
 	bool VoxWriter::OpenFileForWriting(const std::string& vFilePathName)
 	{
-#ifdef MSVC
+#if _MSC_VER
 		lastError = fopen_s(&m_File, vFilePathName.c_str(), "wb");
 #else
         m_File = fopen(vFilePathName.c_str(), "wb");
