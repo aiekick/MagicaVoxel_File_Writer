@@ -245,14 +245,14 @@ namespace vox {
 
 typedef uint32_t KeyFrame;
 
-typedef int32_t CubeX;
-typedef int32_t CubeY;
-typedef int32_t CubeZ;
-typedef int32_t CubeID;
-typedef int32_t VoxelX;
-typedef int32_t VoxelY;
-typedef int32_t VoxelZ;
-typedef int32_t VoxelID;
+typedef size_t CubeX;
+typedef size_t  CubeY;
+typedef size_t  CubeZ;
+typedef size_t  CubeID;
+typedef size_t  VoxelX;
+typedef size_t  VoxelY;
+typedef size_t  VoxelZ;
+typedef size_t  VoxelID;
 typedef int32_t TagID;
 typedef int32_t Version;
 typedef int32_t ColorID;
@@ -466,7 +466,7 @@ public:
     void SetKeyFrameTimeLoggingFunctor(const KeyFrameTimeLoggingFunctor& vKeyFrameTimeLoggingFunctor);
     void SetKeyFrame(uint32_t vKeyFrame);
     void AddColor(const uint8_t& r, const uint8_t& g, const uint8_t& b, const uint8_t& a, const uint8_t& index);
-    void AddVoxel(const int32_t& vX, const int32_t& vY, const int32_t& vZ, const uint8_t& vColorIndex);
+    void AddVoxel(const VoxelX& vX, const VoxelY& vY, const VoxelZ& vZ, const uint8_t& vColorIndex);
     void SaveToFile(const std::string& vFilePathName);
 
     const size_t GetVoxelsCount(const KeyFrame& vKeyFrame) const;
@@ -478,9 +478,9 @@ private:
     void          m_CloseFile();
     long          m_GetFilePos() const;
     void          m_SetFilePos(const long& vPos);
-    const int32_t m_GetCubeId(const int32_t& vX, const int32_t& vY, const int32_t& vZ);
-    VoxCube*      m_GetCube(const int32_t& vX, const int32_t& vY, const int32_t& vZ);
-    void          m_MergeVoxelInCube(const int32_t& vX, const int32_t& vY, const int32_t& vZ, const uint8_t& vColorIndex, VoxCube* vCube);
+    const size_t  m_GetCubeId(const VoxelX& vX, const VoxelY& vY, const VoxelZ& vZ);
+    VoxCube*      m_GetCube(const VoxelX& vX, const VoxelY& vY, const VoxelZ& vZ);
+    void          m_MergeVoxelInCube(const VoxelX& vX, const VoxelY& vY, const VoxelZ& vZ, const uint8_t& vColorIndex, VoxCube* vCube);
 };
 }  // namespace vox
 #endif  //__VOX_WRITER_H__

@@ -3,17 +3,17 @@
 #include <chrono>    // std::chrono
 #include <iostream>  // std::cout
 
-//#define USE_ANIMATED_WAVE
-#define JULIA_REVOLUTE
+#define USE_ANIMATED_WAVE
+//#define JULIA_REVOLUTE
 
 #ifdef JULIA_REVOLUTE
 static double mix(const double& x, const double& y, const double& a) { return x * (1.0 - a) + y * a; }
 int main() {
-    const int32_t SIZE = 500;
-    const double ZOOM_XZ     = 10.0;
-    const double ZOOM_Y      = 10.0;
-    const int32_t ITERATIONS  = 3;
-    const int32_t FRAMES      = 30;
+    const int32_t SIZE = 375;
+    const double ZOOM_XZ     = 7.5;
+    const double ZOOM_Y      = 7.5;
+    const int32_t ITERATIONS  = 5;
+    const int32_t FRAMES      = 1;
 
     double time = 0.0f;
     double kk, hh, px, pz, an, cx, cy, path, rev_x, rev_y, tmp_x, tmp_y, rev_x_squared, rev_y_squared, df;
@@ -29,9 +29,9 @@ int main() {
     for (int32_t f = 0; f < FRAMES; ++f) {
         vox.SetKeyFrame(f);
         time += time_step;
-        for (int32_t i = 0; i < SIZE; ++i) {
+        for (int32_t i = -SIZE; i < SIZE; ++i) {
             px = ((double)i * 2.0 / (double)SIZE - 1.0) * ZOOM_XZ;
-            for (int32_t k = 0; k < SIZE; ++k) {
+            for (int32_t k = -SIZE; k < SIZE; ++k) {
                 pz   = ((double)k * 2.0 / (double)SIZE - 1.0) * ZOOM_XZ;
                 an   = std::atan2(px, pz);
                 cx   = mix(0.2, -0.5, std::sin(an * 2.0));
@@ -41,7 +41,7 @@ int main() {
                 rot2D[1] = -std::sin(an + time);
                 rot2D[2] = std::sin(an + time);
                 rot2D[3] = std::cos(an + time);
-                for (int32_t j = 0; j < SIZE; ++j) {
+                for (int32_t j = -SIZE; j < SIZE; ++j) {
                     tmp_y = ((double)j * 2.0 / (double)SIZE - 1.0) * ZOOM_Y;
                     tmp_x = path;
                     rev_x = rot2D[0] * tmp_x + rot2D[1] * tmp_y; // rx2d
@@ -62,7 +62,7 @@ int main() {
                     df = sqrt(kk / hh) * std::log10(kk);
                     if (std::abs(df) - 0.01 < 0.0) {
                         cube_color = (int32_t)((std::sin(rev_x + rev_y) * 0.5 + 0.5) * 6.0) + 249;
-                        vox.AddVoxel(i, k, j, cube_color);  // magicavoxel use the z as up axis
+                        vox.AddVoxel(i + SIZE, k + SIZE, j + SIZE, cube_color);  // magicavoxel use the z as up axis
                     }
                 }
             }

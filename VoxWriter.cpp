@@ -376,9 +376,9 @@ VoxWriter::VoxWriter(const VoxelX& vMaxVoxelPerCubeX, const VoxelY& vMaxVoxelPer
     // the limit of magicavoxel is 127 because the first voxel is 1 not 0
     // so this is 0 to 126
     // index limit, size is 127
-    m_MaxVoxelPerCubeX = ct::clamp<int32_t>(vMaxVoxelPerCubeX, 0, 126);
-    m_MaxVoxelPerCubeY = ct::clamp<int32_t>(vMaxVoxelPerCubeY, 0, 126);
-    m_MaxVoxelPerCubeZ = ct::clamp<int32_t>(vMaxVoxelPerCubeZ, 0, 126);
+    m_MaxVoxelPerCubeX = ct::clamp<size_t>(vMaxVoxelPerCubeX, 0, 126);
+    m_MaxVoxelPerCubeY = ct::clamp<size_t>(vMaxVoxelPerCubeY, 0, 126);
+    m_MaxVoxelPerCubeZ = ct::clamp<size_t>(vMaxVoxelPerCubeZ, 0, 126);
 }
 
 VoxWriter::~VoxWriter() {}
@@ -441,15 +441,15 @@ void VoxWriter::AddColor(const uint8_t& r, const uint8_t& g, const uint8_t& b, c
     colors[index] = GetID(r, g, b, a);
 }
 
-void VoxWriter::AddVoxel(const int32_t& vX, const int32_t& vY, const int32_t& vZ, const uint8_t& vColorIndex) {
+void VoxWriter::AddVoxel(const size_t& vX, const size_t& vY, const size_t& vZ, const uint8_t& vColorIndex) {
     // cube pos
-    int32_t ox = (int32_t)std::floor((double)vX / (double)m_MaxVoxelPerCubeX);
-    int32_t oy = (int32_t)std::floor((double)vY / (double)m_MaxVoxelPerCubeY);
-    int32_t oz = (int32_t)std::floor((double)vZ / (double)m_MaxVoxelPerCubeZ);
+    size_t  ox = (size_t)std::floor((double)vX / (double)m_MaxVoxelPerCubeX);
+    size_t oy = (size_t)std::floor((double)vY / (double)m_MaxVoxelPerCubeY);
+    size_t  oz = (size_t)std::floor((double)vZ / (double)m_MaxVoxelPerCubeZ);
 
-    minCubeX = ct::mini<int32_t>(minCubeX, ox);
-    minCubeY = ct::mini<int32_t>(minCubeX, oy);
-    minCubeZ = ct::mini<int32_t>(minCubeX, oz);
+    minCubeX = ct::mini<size_t>(minCubeX, ox);
+    minCubeY = ct::mini<size_t>(minCubeX, oy);
+    minCubeZ = ct::mini<size_t>(minCubeX, oz);
 
     auto cube = m_GetCube(ox, oy, oz);
 
@@ -486,7 +486,7 @@ void VoxWriter::SaveToFile(const std::string& vFilePathName) {
         std::vector<nSHP> shapes;
         std::vector<nTRN> shapeTransforms;
         size_t            cube_idx = 0U;
-        size_t            model_id = 0U;
+        int32_t           model_id = 0U;
         for (auto& cube : cubes) {
             cube.write(m_File);
 
@@ -503,7 +503,7 @@ void VoxWriter::SaveToFile(const std::string& vFilePathName) {
             shapeTransforms.push_back(trans);
 
             // shape
-            nSHP shape(cube.xyzis.size());
+            nSHP shape((int32_t)cube.xyzis.size());
             shape.nodeId            = nodeIds;
             size_t model_array_id = 0U;
             for (const auto& xyzi : cube.xyzis) {
@@ -634,7 +634,7 @@ void VoxWriter::m_SetFilePos(const long& vPos) {
     fseek(m_File, vPos, SEEK_SET);
 }
 
-const int32_t VoxWriter::m_GetCubeId(const int32_t& vX, const int32_t& vY, const int32_t& vZ) {
+const size_t VoxWriter::m_GetCubeId(const VoxelX& vX, const VoxelY& vY, const VoxelZ& vZ) {
     if (cubesId.find(vX) != cubesId.end()) {
         if (cubesId[vX].find(vY) != cubesId[vX].end()) {
             if (cubesId[vX][vY].find(vZ) != cubesId[vX][vY].end()) {
@@ -649,7 +649,7 @@ const int32_t VoxWriter::m_GetCubeId(const int32_t& vX, const int32_t& vY, const
 }
 
 // Wrap a position inside a particular cube dimension
-inline uint8_t Wrap(int v, int lim) {
+inline uint8_t Wrap(size_t v, size_t lim) {
     v = v % lim;
     if (v < 0) {
         v += lim;
@@ -657,7 +657,7 @@ inline uint8_t Wrap(int v, int lim) {
     return (uint8_t)v;
 }
 
-void VoxWriter::m_MergeVoxelInCube(const int32_t& vX, const int32_t& vY, const int32_t& vZ, const uint8_t& vColorIndex, VoxCube* vCube) {
+void VoxWriter::m_MergeVoxelInCube(const VoxelX& vX, const VoxelY& vY, const VoxelZ& vZ, const uint8_t& vColorIndex, VoxCube* vCube) {
     maxVolume.Combine(ct::dvec3((double)vX, (double)vY, (double)vZ));
 
     bool exist = false;
@@ -687,26 +687,26 @@ void VoxWriter::m_MergeVoxelInCube(const int32_t& vX, const int32_t& vY, const i
     }
 }
 
-VoxCube* VoxWriter::m_GetCube(const int32_t& vX, const int32_t& vY, const int32_t& vZ) {
-    int32_t id = m_GetCubeId(vX, vY, vZ);
+VoxCube* VoxWriter::m_GetCube(const VoxelX& vX, const VoxelY& vY, const VoxelZ& vZ) {
+    const auto& id = m_GetCubeId(vX, vY, vZ);
 
     if (id == cubes.size()) {
         VoxCube c;
 
-        c.id = id;
+        c.id = (int32_t)id;
 
-        c.tx = vX;
-        c.ty = vY;
-        c.tz = vZ;
+        c.tx = (int32_t)vX;
+        c.ty = (int32_t)vY;
+        c.tz = (int32_t)vZ;
 
-        c.size.sizex = m_MaxVoxelPerCubeX;
-        c.size.sizey = m_MaxVoxelPerCubeY;
-        c.size.sizez = m_MaxVoxelPerCubeZ;
+        c.size.sizex = (int32_t)m_MaxVoxelPerCubeX;
+        c.size.sizey = (int32_t)m_MaxVoxelPerCubeY;
+        c.size.sizez = (int32_t)m_MaxVoxelPerCubeZ;
 
         cubes.push_back(c);
     }
 
-    if (id < (int32_t)cubes.size()) {
+    if (id < cubes.size()) {
         return &cubes[id];
     }
 
