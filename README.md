@@ -16,7 +16,7 @@ With this simple code (thanks to [@unphased](https://github.com/unphased))
 #include "VoxWriter.h"
 int main() 
 {
-	const int32_t  SIZE      = 189;
+    const int32_t  SIZE      = 189;
     const int32_t  OFFSET    = SIZE;
     const float    Z_SCALE   = 1.0f;
     const int32_t  FRAMES    = 30;
@@ -24,7 +24,7 @@ int main()
 	
     vox::VoxWriter vox;
     
-	vox.StartTimeLogging();
+    vox.StartTimeLogging();
     float time = 0.0f;
     for (int32_t k = 0; k < FRAMES; ++k) {
         vox.SetKeyFrame(k);
