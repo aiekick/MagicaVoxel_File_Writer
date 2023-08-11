@@ -27,12 +27,15 @@
 #ifndef __VOX_WRITER_H__
 #define __VOX_WRITER_H__
 
-#include <cstdint>
+#include <map>
 #include <cmath>
 #include <string>
-#include <map>
 #include <vector>
+#include <chrono>
+#include <cstdint>
 #include <sstream>
+#include <functional>
+
 // extracted and adapted from https://github.com/aiekick/cTools (LICENSE MIT)
 // for make VoxWriter lib free
 #define SAFE_DELETE(a) \
@@ -239,6 +242,25 @@ inline dAABBCC operator/(const dAABBCC& v, dAABBCC f) { return dAABBCC(v.lowerBo
 }  // namespace ct
 
 namespace vox {
+
+typedef uint32_t KeyFrame;
+
+typedef int32_t CubeX;
+typedef int32_t CubeY;
+typedef int32_t CubeZ;
+typedef int32_t CubeID;
+typedef int32_t VoxelX;
+typedef int32_t VoxelY;
+typedef int32_t VoxelZ;
+typedef int32_t VoxelID;
+typedef int32_t TagID;
+typedef int32_t Version;
+typedef int32_t ColorID;
+
+typedef ct::dAABBCC Volume;
+
+typedef std::function<void(const KeyFrame& vKeyFrame, const double& vValue)> KeyFrameTimeLoggingFunctor;
+
 inline uint32_t GetMVID(uint8_t a, uint8_t b, uint8_t c, uint8_t d) { return (a) | (b << 8) | (c << 16) | (d << 24); }
 
 struct DICTstring {
@@ -359,22 +381,6 @@ struct RGBA {
     size_t getSize();
 };
 
-typedef uint32_t KeyFrame;
-
-typedef int32_t CubeX;
-typedef int32_t CubeY;
-typedef int32_t CubeZ;
-typedef int32_t CubeID;
-typedef int32_t VoxelX;
-typedef int32_t VoxelY;
-typedef int32_t VoxelZ;
-typedef int32_t VoxelID;
-typedef int32_t TagID;
-typedef int32_t Version;
-typedef int32_t ColorID;
-
-typedef ct::dAABBCC Volume;
-
 struct VoxCube {
     int id;
 
@@ -390,6 +396,7 @@ struct VoxCube {
 
     void write(FILE* fp);
 };
+
 
 class VoxWriter {
 public:
@@ -431,34 +438,49 @@ private:
 
     std::vector<VoxCube> cubes;
 
-    std::map<CubeX, std::map<CubeY, std::map<CubeZ, CubeID>>>     cubesId;
-    std::map<VoxelX, std::map<VoxelY, std::map<VoxelZ, VoxelID>>> voxelId;
+    std::map<CubeX, std::map<CubeY, std::map<CubeZ, CubeID>>>                         cubesId;
+    std::map<KeyFrame, std::map<VoxelX, std::map<VoxelY, std::map<VoxelZ, VoxelID>>>> voxelId;
 
     int32_t lastError = 0;
+
+    bool m_TimeLoggingEnabled = false; // for log elapsed time between key frames and total
+
+    std::chrono::steady_clock::time_point m_StartTime;
+    std::chrono::steady_clock::time_point m_LastKeyFrameTime;
+    std::map<KeyFrame, double>            m_FrameTimes;
+    double                                m_TotalTime;
+
+    KeyFrameTimeLoggingFunctor m_KeyFrameTimeLoggingFunctor;
 
 public:
     VoxWriter(const VoxelX& vMaxVoxelPerCubeX = 126, const VoxelY& vMaxVoxelPerCubeY = 126, const VoxelZ& vMaxVoxelPerCubeZ = 126);
     ~VoxWriter();
+
     int32_t IsOk(const std::string& vFilePathName);
-    void    ClearVoxels();
-    void    ClearColors();
-    void    SetKeyFrame(uint32_t vKeyFrame);
-    void    AddColor(const uint8_t& r, const uint8_t& g, const uint8_t& b, const uint8_t& a, const uint8_t& index);
-    void    AddVoxel(const int32_t& vX, const int32_t& vY, const int32_t& vZ, const uint8_t& vColorIndex);
-    void    SaveToFile(const std::string& vFilePathName);
+
+    void ClearVoxels();
+    void ClearColors();
+    
+    void StartTimeLogging();
+    void StopTimeLogging();
+    void SetKeyFrameTimeLoggingFunctor(const KeyFrameTimeLoggingFunctor& vKeyFrameTimeLoggingFunctor);
+    void SetKeyFrame(uint32_t vKeyFrame);
+    void AddColor(const uint8_t& r, const uint8_t& g, const uint8_t& b, const uint8_t& a, const uint8_t& index);
+    void AddVoxel(const int32_t& vX, const int32_t& vY, const int32_t& vZ, const uint8_t& vColorIndex);
+    void SaveToFile(const std::string& vFilePathName);
+
     const size_t GetVoxelsCount(const KeyFrame& vKeyFrame) const;
     const size_t GetVoxelsCount() const;
-    const size_t GetKeyFramesCount() const;
-    void    PrintStats() const;
+    void         PrintStats() const;
 
 private:
-    bool          OpenFileForWriting(const std::string& vFilePathName);
-    void          CloseFile();
-    long          GetFilePos() const;
-    void          SetFilePos(const long& vPos);
-    const int32_t GetCubeId(const int32_t& vX, const int32_t& vY, const int32_t& vZ);
-    VoxCube*      GetCube(const int32_t& vX, const int32_t& vY, const int32_t& vZ);
-    void          MergeVoxelInCube(const int32_t& vX, const int32_t& vY, const int32_t& vZ, const uint8_t& vColorIndex, VoxCube* vCube);
+    bool          m_OpenFileForWriting(const std::string& vFilePathName);
+    void          m_CloseFile();
+    long          m_GetFilePos() const;
+    void          m_SetFilePos(const long& vPos);
+    const int32_t m_GetCubeId(const int32_t& vX, const int32_t& vY, const int32_t& vZ);
+    VoxCube*      m_GetCube(const int32_t& vX, const int32_t& vY, const int32_t& vZ);
+    void          m_MergeVoxelInCube(const int32_t& vX, const int32_t& vY, const int32_t& vZ, const uint8_t& vColorIndex, VoxCube* vCube);
 };
 }  // namespace vox
 #endif  //__VOX_WRITER_H__

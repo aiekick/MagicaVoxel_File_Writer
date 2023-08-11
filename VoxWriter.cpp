@@ -379,15 +379,13 @@ VoxWriter::VoxWriter(const VoxelX& vMaxVoxelPerCubeX, const VoxelY& vMaxVoxelPer
     m_MaxVoxelPerCubeX = ct::clamp<int32_t>(vMaxVoxelPerCubeX, 0, 126);
     m_MaxVoxelPerCubeY = ct::clamp<int32_t>(vMaxVoxelPerCubeY, 0, 126);
     m_MaxVoxelPerCubeZ = ct::clamp<int32_t>(vMaxVoxelPerCubeZ, 0, 126);
-
-    SetKeyFrame(0U);
 }
 
 VoxWriter::~VoxWriter() {}
 
 int32_t VoxWriter::IsOk(const std::string& vFilePathName) {
-    if (OpenFileForWriting(vFilePathName)) {
-        CloseFile();
+    if (m_OpenFileForWriting(vFilePathName)) {
+        m_CloseFile();
     }
     return lastError;
 }
@@ -400,8 +398,41 @@ void VoxWriter::ClearVoxels() {
 
 void VoxWriter::ClearColors() { colors.clear(); }
 
-void VoxWriter::SetKeyFrame(uint32_t vKeyFrame) { 
-    m_KeyFrame = vKeyFrame;
+void VoxWriter::StartTimeLogging() {
+    m_TimeLoggingEnabled = true;
+    m_StartTime          = std::chrono::steady_clock::now();
+    m_LastKeyFrameTime   = m_StartTime;
+};
+
+void VoxWriter::StopTimeLogging() {
+    if (m_TimeLoggingEnabled) {
+        const auto now           = std::chrono::steady_clock::now();
+        m_FrameTimes[m_KeyFrame] = std::chrono::duration_cast<std::chrono::milliseconds>(now - m_LastKeyFrameTime).count() * 1e-3;
+        if (m_KeyFrameTimeLoggingFunctor) {
+            m_KeyFrameTimeLoggingFunctor(m_KeyFrame, m_FrameTimes.at(m_KeyFrame));
+        }
+        m_TotalTime              = std::chrono::duration_cast<std::chrono::milliseconds>(now - m_StartTime).count() * 1e-3;
+        m_TimeLoggingEnabled = false;
+    }
+}
+
+void VoxWriter::SetKeyFrameTimeLoggingFunctor(const KeyFrameTimeLoggingFunctor& vKeyFrameTimeLoggingFunctor) {
+    m_KeyFrameTimeLoggingFunctor = vKeyFrameTimeLoggingFunctor;
+}
+
+void VoxWriter::SetKeyFrame(uint32_t vKeyFrame) {
+    if (m_KeyFrame != vKeyFrame) {
+        if (m_TimeLoggingEnabled) {
+            const auto now           = std::chrono::steady_clock::now();
+            const auto elapsed       = now - m_LastKeyFrameTime;
+            m_FrameTimes[m_KeyFrame] = std::chrono::duration_cast<std::chrono::milliseconds>(elapsed).count() * 1e-3;
+            if (m_KeyFrameTimeLoggingFunctor) {
+                m_KeyFrameTimeLoggingFunctor(m_KeyFrame, m_FrameTimes.at(m_KeyFrame));
+            }
+            m_LastKeyFrameTime = now;
+        }
+        m_KeyFrame = vKeyFrame;
+    }
 }
 
 void VoxWriter::AddColor(const uint8_t& r, const uint8_t& g, const uint8_t& b, const uint8_t& a, const uint8_t& index) {
@@ -420,13 +451,13 @@ void VoxWriter::AddVoxel(const int32_t& vX, const int32_t& vY, const int32_t& vZ
     minCubeY = ct::mini<int32_t>(minCubeX, oy);
     minCubeZ = ct::mini<int32_t>(minCubeX, oz);
 
-    auto cube = GetCube(ox, oy, oz);
+    auto cube = m_GetCube(ox, oy, oz);
 
-    MergeVoxelInCube(vX, vY, vZ, vColorIndex, cube);
+    m_MergeVoxelInCube(vX, vY, vZ, vColorIndex, cube);
 }
 
 void VoxWriter::SaveToFile(const std::string& vFilePathName) {
-    if (OpenFileForWriting(vFilePathName)) {
+    if (m_OpenFileForWriting(vFilePathName)) {
         int32_t zero = 0;
 
         fwrite(&ID_VOX, sizeof(int32_t), 1, m_File);
@@ -436,82 +467,60 @@ void VoxWriter::SaveToFile(const std::string& vFilePathName) {
         fwrite(&ID_MAIN, sizeof(int32_t), 1, m_File);
         fwrite(&zero, sizeof(int32_t), 1, m_File);
 
-        long numBytesMainChunkPos = GetFilePos();
+        long numBytesMainChunkPos = m_GetFilePos();
         fwrite(&zero, sizeof(int32_t), 1, m_File);
 
-        long headerSize = GetFilePos();
+        long headerSize = m_GetFilePos();
 
-        int32_t count   = (int32_t)cubes.size();
+        int count = (int)cubes.size();
 
-        //////////////////////////////////////
-        /// FIRST STEP : WRITE ALL CUBES /////
-        //////////////////////////////////////
-
-        for (auto& cube_key : cubes) {
-            for (auto& key_frame : cube_key) {
-                key_frame.second.write(m_File);
-            }
-        }
-
-        //////////////////////////////////////
-        /// SECOND STEP : WRITE ROOT GROUP ///
-        //////////////////////////////////////
-
+        int  nodeIds = 0;
         nTRN rootTransform(1);
-        rootTransform.nodeId      = 0;
-        rootTransform.childNodeId = 1;
+        rootTransform.nodeId      = nodeIds;
+        rootTransform.childNodeId = ++nodeIds;
 
         nGRP rootGroup(count);
-        rootGroup.nodeId            = 1;
+        rootGroup.nodeId            = nodeIds;  //
         rootGroup.nodeChildrenNodes = count;
 
-        int32_t cube_idx = 0;
-        for (auto& cube_key : cubes) {
-            rootGroup.childNodes[cube_idx] = 2 + cube_idx * 2;
+        std::vector<nSHP> shapes;
+        std::vector<nTRN> shapeTransforms;
+        size_t            cube_idx = 0U;
+        size_t            model_id = 0U;
+        for (auto& cube : cubes) {
+            cube.write(m_File);
+
+            // trans
+            nTRN trans(1);// not a trans anim so ony one frame
+            trans.nodeId                   = ++nodeIds;  //
+            rootGroup.childNodes[cube_idx] = nodeIds;
+            trans.childNodeId              = ++nodeIds;
+            trans.layerId                  = 0;
+            cube.tx = (int)std::floor((cube.tx - minCubeX + 0.5f) * m_MaxVoxelPerCubeX - maxVolume.lowerBound.x - maxVolume.Size().x * 0.5);
+            cube.ty = (int)std::floor((cube.ty - minCubeY + 0.5f) * m_MaxVoxelPerCubeY - maxVolume.lowerBound.y - maxVolume.Size().y * 0.5);
+            cube.tz = (int)std::floor((cube.tz - minCubeZ + 0.5f) * m_MaxVoxelPerCubeZ);
+            trans.frames[0].Add("_t", ct::toStr(cube.tx) + " " + ct::toStr(cube.ty) + " " + ct::toStr(cube.tz));
+            shapeTransforms.push_back(trans);
+
+            // shape
+            nSHP shape(cube.xyzis.size());
+            shape.nodeId            = nodeIds;
+            size_t model_array_id = 0U;
+            for (const auto& xyzi : cube.xyzis) {
+                shape.models[model_array_id].modelId = model_id;
+                shape.models[model_array_id].modelAttribs.Add("_f", ct::toStr(xyzi.first));
+                ++model_array_id;
+                ++model_id;
+            }
+            shapes.push_back(shape);
+
             ++cube_idx;
         }
 
         rootTransform.write(m_File);
         rootGroup.write(m_File);
 
-        //////////////////////////////////////
-        /// THIRD STEP : WRITE SHAPES ////////
-        //////////////////////////////////////
-
-        std::vector<nSHP> shapes;
-        std::vector<nTRN> shapeTransforms;
-        int32_t           nodeIds  = 1;
-        size_t            cube_key_idx = 0U;
-        for (auto& cube_key : cubes) {
-
-            // cube trans
-            auto& first_cube = cube_key.begin()->second;
-            nTRN  trans(1);  // no trans anim so one frame only
-            trans.nodeId                   = ++nodeIds;
-            trans.childNodeId              = ++nodeIds;
-            trans.layerId                  = 0;
-            first_cube.tx                  = (int)std::floor((first_cube.tx - minCubeX + 0.5f) * m_MaxVoxelPerCubeX - maxVolume.lowerBound.x - maxVolume.Size().x * 0.5);
-            first_cube.ty                  = (int)std::floor((first_cube.ty - minCubeY + 0.5f) * m_MaxVoxelPerCubeY - maxVolume.lowerBound.y - maxVolume.Size().y * 0.5);
-            first_cube.tz                  = (int)std::floor((first_cube.tz - minCubeZ + 0.5f) * m_MaxVoxelPerCubeZ);
-            trans.frames[0].Add("_t", ct::toStr(first_cube.tx) + " " + ct::toStr(first_cube.ty) + " " + ct::toStr(first_cube.tz));
-            shapeTransforms.push_back(trans);
-
-
-            // one model per key frame
-            nSHP shape(cube_key.size());
-            shape.nodeId     = nodeIds;
-            size_t model_idx = 0U;
-            for (auto& key_frame : cube_key) {
-                shape.models[model_idx].modelId = cube_key_idx + model_idx;
-                shape.models[model_idx].modelAttribs.Add("_f", ct::toStr(key_frame.first));
-                ++model_idx;
-            }
-            shapes.push_back(shape);
-
-            ++cube_key_idx;
-        }
-
-        // write transforms and shapes
+        // trn & shp
         for (int i = 0; i < count; i++) {
             shapeTransforms[i].write(m_File);
             shapes[i].write(m_File);
@@ -542,12 +551,12 @@ void VoxWriter::SaveToFile(const std::string& vFilePathName) {
             palette.write(m_File);
         }
 
-        const long mainChildChunkSize = GetFilePos() - headerSize;
-        SetFilePos(numBytesMainChunkPos);
+        const long mainChildChunkSize = m_GetFilePos() - headerSize;
+        m_SetFilePos(numBytesMainChunkPos);
         uint32_t size = (uint32_t)mainChildChunkSize;
         fwrite(&size, sizeof(uint32_t), 1, m_File);
 
-        CloseFile();
+        m_CloseFile();
     }
 }
 
@@ -571,31 +580,38 @@ const size_t VoxWriter::GetVoxelsCount() const {
     return voxel_count;
 }
 
-const size_t VoxWriter::GetKeyFramesCount() const {
-    return cubes.size();
-}
-
 void VoxWriter::PrintStats() const {
-    std::cout << "---- Stats -----" << std::endl;
+    std::cout << "---- Stats ------------------------------" << std::endl;
     std::cout << "Volume : " << maxVolume.Size().x << " x " << maxVolume.Size().y << " x " << maxVolume.Size().z << std::endl;
     std::cout << "count cubes : " << cubes.size() << std::endl;
-    std::cout << "count key frames : " << GetKeyFramesCount() << std::endl;
-    std::cout << "----------------" << std::endl;
-    size_t voxels_total = 0U;
+    std::map<KeyFrame, size_t> frame_counts;
     for (const auto& cube : cubes) {
         for (auto& key_xyzi : cube.xyzis) {
-            std::cout << "-|-> key frame : " << key_xyzi.first << std::endl;
-            const auto& voxels_count = key_xyzi.second.numVoxels;
-            std::cout << " |-> voxels count : " << voxels_count << std::endl;
-            voxels_total += voxels_count;
+            frame_counts[key_xyzi.first] += key_xyzi.second.numVoxels;
         }
     }
-    std::cout << "----------------" << std::endl;
+    size_t voxels_total = 0U;
+    if (frame_counts.size() > 1U) {
+        std::cout << "count key frames : " << frame_counts.size() << std::endl;
+        std::cout << "-----------------------------------------" << std::endl;
+        for (const auto& frame_count : frame_counts) {
+            std::cout << " o--\\-> key frame : " << frame_count.first << std::endl;
+            std::cout << "     \\-> voxels count : " << frame_count.second << std::endl;
+            if (m_FrameTimes.find(frame_count.first) != m_FrameTimes.end()) {
+                std::cout << "      \\-> elapsed time : " << m_FrameTimes.at(frame_count.first) << " secs" << std::endl;
+            }
+            voxels_total += frame_count.second;
+        }
+        std::cout << "-----------------------------------------" << std::endl;
+    } else if (!frame_counts.empty()) {
+        voxels_total = frame_counts.begin()->second;
+    }
     std::cout << "voxels total : " << voxels_total << std::endl;
-    std::cout << "----------------" << std::endl;
+    std::cout << "total elapsed time : " << m_TotalTime << " secs" << std::endl;
+    std::cout << "-----------------------------------------" << std::endl;
 }
 
-bool VoxWriter::OpenFileForWriting(const std::string& vFilePathName) {
+bool VoxWriter::m_OpenFileForWriting(const std::string& vFilePathName) {
 #if _MSC_VER
     lastError = fopen_s(&m_File, vFilePathName.c_str(), "wb");
 #else
@@ -607,18 +623,18 @@ bool VoxWriter::OpenFileForWriting(const std::string& vFilePathName) {
     return true;
 }
 
-void VoxWriter::CloseFile() { fclose(m_File); }
+void VoxWriter::m_CloseFile() { fclose(m_File); }
 
-long VoxWriter::GetFilePos() const { return ftell(m_File); }
+long VoxWriter::m_GetFilePos() const { return ftell(m_File); }
 
-void VoxWriter::SetFilePos(const long& vPos) {
+void VoxWriter::m_SetFilePos(const long& vPos) {
     //  SEEK_SET	Beginning of file
     //  SEEK_CUR	Current position of the file pointer
     //	SEEK_END	End of file
     fseek(m_File, vPos, SEEK_SET);
 }
 
-const int32_t VoxWriter::GetCubeId(const int32_t& vX, const int32_t& vY, const int32_t& vZ) {
+const int32_t VoxWriter::m_GetCubeId(const int32_t& vX, const int32_t& vY, const int32_t& vZ) {
     if (cubesId.find(vX) != cubesId.end()) {
         if (cubesId[vX].find(vY) != cubesId[vX].end()) {
             if (cubesId[vX][vY].find(vZ) != cubesId[vX][vY].end()) {
@@ -641,34 +657,38 @@ inline uint8_t Wrap(int v, int lim) {
     return (uint8_t)v;
 }
 
-void VoxWriter::MergeVoxelInCube(const int32_t& vX, const int32_t& vY, const int32_t& vZ, const uint8_t& vColorIndex, VoxCube* vCube) {
+void VoxWriter::m_MergeVoxelInCube(const int32_t& vX, const int32_t& vY, const int32_t& vZ, const uint8_t& vColorIndex, VoxCube* vCube) {
     maxVolume.Combine(ct::dvec3((double)vX, (double)vY, (double)vZ));
 
     bool exist = false;
-
-    if (voxelId.find(vX) != voxelId.end()) {
-        if (voxelId[vX].find(vY) != voxelId[vX].end()) {
-            if (voxelId[vX][vY].find(vZ) != voxelId[vX][vY].end()) {
-                exist = true;
+    if (voxelId.find(m_KeyFrame) != voxelId.end()) {
+        auto& vidk = voxelId.at(m_KeyFrame);
+        if (vidk.find(vX) != vidk.end()) {
+            auto& vidkx = vidk.at(vX);
+            if (vidkx.find(vY) != vidkx.end()) {
+                auto& vidkxy = vidkx.at(vY);
+                if (vidkxy.find(vZ) != vidkxy.end()) {
+                    exist = true;
+                }
             }
         }
     }
 
-    if (exist == false) {
+    if (!exist) {
         auto& xyzi = vCube->xyzis[m_KeyFrame];
         xyzi.voxels.push_back(Wrap(vX, m_MaxVoxelPerCubeX));                      // x
         xyzi.voxels.push_back(Wrap(vY, m_MaxVoxelPerCubeY));                      // y
         xyzi.voxels.push_back(Wrap(vZ, m_MaxVoxelPerCubeZ));                      // z
 
         // correspond a la loc de la couleur du voxel en question
-        voxelId[vX][vY][vZ] = (int)xyzi.voxels.size();
+        voxelId[m_KeyFrame][vX][vY][vZ] = (int)xyzi.voxels.size();
 
         xyzi.voxels.push_back(vColorIndex);  // color index
     }
 }
 
-VoxCube* VoxWriter::GetCube(const int32_t& vX, const int32_t& vY, const int32_t& vZ) {
-    int32_t id = GetCubeId(vX, vY, vZ);
+VoxCube* VoxWriter::m_GetCube(const int32_t& vX, const int32_t& vY, const int32_t& vZ) {
+    int32_t id = m_GetCubeId(vX, vY, vZ);
 
     if (id == cubes.size()) {
         VoxCube c;
